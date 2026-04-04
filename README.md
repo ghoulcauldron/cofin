@@ -1,6 +1,6 @@
 # cofin ☕
 
-> your money, together
+> your money, together, forever, til death
 
 Personal financial tracker for couples. PDF statement import, copy/paste transactions, joint expense tracking, budgeting and forecasting.
 
