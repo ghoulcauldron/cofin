@@ -256,10 +256,37 @@ export default function ImportPage() {
             </div>
           )}
 
-          {/* Select all */}
-          <div style={{ display:'flex', gap:12, marginBottom:12, fontSize:12, color:'var(--muted)' }}>
+          {/* Select all + bulk edit toolbar */}
+          <div style={{ display:'flex', gap:12, marginBottom:12, fontSize:12, color:'var(--muted)', flexWrap:'wrap', alignItems:'center' }}>
             <button className="btn btn-sm btn-ghost" onClick={() => setReviewed(prev => prev.map(r => ({ ...r, _include: true })))}>Select all</button>
             <button className="btn btn-sm btn-ghost" onClick={() => setReviewed(prev => prev.map(r => ({ ...r, _include: false })))}>Deselect all</button>
+            <span style={{ width:'0.5px', height:16, background:'var(--border2)', alignSelf:'center' }} />
+            {/* Bulk category */}
+            <select
+              defaultValue=""
+              onChange={e => {
+                if (!e.target.value) return
+                const cat = e.target.value
+                setReviewed(prev => prev.map(r => r._include ? { ...r, category: cat } : r))
+                e.target.value = ''
+              }}
+              style={{ background:'var(--bg3)', border:'0.5px solid var(--border2)', color:'var(--muted)', fontSize:11, borderRadius:6, padding:'3px 8px', outline:'none', cursor:'pointer' }}
+            >
+              <option value="" disabled>Set category for selected…</option>
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {/* Bulk joint */}
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={() => setReviewed(prev => {
+                const anyJoint = prev.some(r => r._include && r.is_joint)
+                return prev.map(r => r._include ? { ...r, is_joint: !anyJoint } : r)
+              })}
+              style={{ display:'flex', alignItems:'center', gap:5 }}
+            >
+              <span style={{ width:10, height:10, borderRadius:2, background:'var(--accent2)', display:'inline-block', opacity:0.8 }} />
+              Toggle joint for selected
+            </button>
             <span style={{ marginLeft:'auto', alignSelf:'center' }}>{reviewed.filter(r => r._include).length} selected</span>
           </div>
 
