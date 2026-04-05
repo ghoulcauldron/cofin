@@ -48,14 +48,13 @@ transactionsRouter.post('/', async (req, res) => {
   res.json(data)
 })
 
-// Bulk insert after import review — with proper deduplication
+// Bulk insert after import review — explicit dedup via fingerprint lookup
 transactionsRouter.post('/bulk', async (req, res) => {
   const { transactions } = req.body
   const workspaceId = req.user.user_metadata.workspaceId
 
+  // Generate fingerprints for all incoming transactions
   const enriched = transactions.map(t => {
-    // Fingerprint includes date + normalized description + amount
-    // so two transactions on the same date are NOT considered duplicates
     const raw = `${workspaceId}|${t.date}|${(t.description || '').toLowerCase().trim()}|${Number(t.amount).toFixed(2)}`
     const fingerprint = Buffer.from(raw).toString('base64').slice(0, 32)
     return {
@@ -69,20 +68,32 @@ transactionsRouter.post('/bulk', async (req, res) => {
     }
   })
 
-  // Upsert — skip true duplicates (same date + description + amount), insert everything else
+  // Fetch existing fingerprints for this workspace to detect duplicates explicitly
+  const incomingFingerprints = enriched.map(t => t.fingerprint)
+  const { data: existing } = await supabase
+    .from('transactions')
+    .select('fingerprint')
+    .eq('workspace_id', workspaceId)
+    .in('fingerprint', incomingFingerprints)
+
+  const existingSet = new Set((existing || []).map(r => r.fingerprint))
+
+  // Only insert rows whose fingerprint doesn't already exist
+  const toInsert = enriched.filter(t => !existingSet.has(t.fingerprint))
+  const skipped = enriched.length - toInsert.length
+
+  if (toInsert.length === 0) {
+    return res.json({ inserted: 0, skipped, data: [] })
+  }
+
   const { data, error } = await supabase
     .from('transactions')
-    .upsert(enriched, {
-      onConflict: 'workspace_id,fingerprint',
-      ignoreDuplicates: true
-    })
+    .insert(toInsert)
     .select()
 
   if (error) return res.status(400).json({ error: error.message })
 
-  const inserted = data?.length || 0
-  const skipped = enriched.length - inserted
-  res.json({ inserted, skipped, data })
+  res.json({ inserted: data.length, skipped, data })
 })
 
 transactionsRouter.patch('/:id', async (req, res) => {
