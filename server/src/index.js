@@ -25,6 +25,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'cofin-api' }))
 
+app.get('/api/debug/me', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1]
+  if (!token) return res.json({ error: 'no token' })
+  const { data: { user }, error } = await supabase.auth.getUser(token)
+  res.json({ user, error })
+})
+
 // Routes
 app.use('/api/auth', authRouter)
 app.use('/api/transactions', transactionsRouter)
