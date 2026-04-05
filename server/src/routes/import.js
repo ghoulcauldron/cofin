@@ -57,3 +57,15 @@ importRouter.post('/paste', async (req, res) => {
     res.status(422).json({ error: 'Could not parse pasted text', detail: err.message })
   }
 })
+
+// Add temporarily to server/src/routes/import.js
+importRouter.post('/debug-pdf', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file' })
+  const pdfParse = (await import('pdf-parse')).default
+  const pdf = await pdfParse(req.file.buffer)
+  res.json({ 
+    text: pdf.text,
+    pages: pdf.numpages,
+    length: pdf.text.length
+  })
+})
