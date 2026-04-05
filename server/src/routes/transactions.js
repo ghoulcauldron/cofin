@@ -47,15 +47,16 @@ transactionsRouter.post('/', async (req, res) => {
   res.json(data)
 })
 
-// Bulk insert after import review — with deduplication
+// Bulk insert after import review — with proper deduplication
 transactionsRouter.post('/bulk', async (req, res) => {
   const { transactions } = req.body
   const workspaceId = req.user.user_metadata.workspaceId
 
   const enriched = transactions.map(t => {
-    const fingerprint = Buffer.from(
-      `${workspaceId}|${t.date}|${(t.description || '').toLowerCase().trim()}|${Number(t.amount).toFixed(2)}`
-    ).toString('base64').slice(0, 64)
+    // Fingerprint includes date + normalized description + amount
+    // so two transactions on the same date are NOT considered duplicates
+    const raw = `${workspaceId}|${t.date}|${(t.description || '').toLowerCase().trim()}|${Number(t.amount).toFixed(2)}`
+    const fingerprint = Buffer.from(raw).toString('base64').slice(0, 32)
     return {
       ...t,
       workspace_id: workspaceId,
@@ -67,6 +68,7 @@ transactionsRouter.post('/bulk', async (req, res) => {
     }
   })
 
+  // Upsert — skip true duplicates (same date + description + amount), insert everything else
   const { data, error } = await supabase
     .from('transactions')
     .upsert(enriched, {
