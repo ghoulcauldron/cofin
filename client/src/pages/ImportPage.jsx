@@ -5,9 +5,16 @@ import { useNavigate } from 'react-router-dom'
 const INSTITUTIONS = ['generic','chase','amex','bofa','citi','wellsfargo']
 
 const CATEGORIES = [
+  // Spending
   'Groceries','Dining','Transportation','Utilities','Rent/Mortgage',
-  'Entertainment','Shopping','Health','Travel','Income','Transfer',
-  'Subscriptions','Insurance','Cash','Uncategorized'
+  'Entertainment','Shopping','Health','Travel','Subscriptions',
+  'Insurance','Personal Care','Education','Pets',
+  // Money movement
+  'CC Payment','Transfer','P2P Transfer','ATM/Cash',
+  // Income
+  'Income','Freelance Income','Reimbursement',
+  // Catch-all
+  'Uncategorized'
 ]
 
 function fmt(n) {
