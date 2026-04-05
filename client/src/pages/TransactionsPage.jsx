@@ -15,12 +15,20 @@ export default function TransactionsPage() {
   const [offset, setOffset] = useState(0)
   const limit = 30
 
+  const FILTERS = [
+    { key: 'all',      label: 'All' },
+    { key: 'expense',  label: 'Expenses' },
+    { key: 'income',   label: 'Income' },
+    { key: 'joint',    label: 'Joint' },
+  ]
+
   async function load(off = 0, f = filter) {
     setLoading(true)
     try {
       const params = new URLSearchParams({ limit, offset: off })
-      if (f === 'joint') params.set('is_joint', 'true')
-      if (f === 'income') params.set('type', 'income') // note: API doesn't filter type yet, extend as needed
+      if (f === 'joint')   params.set('is_joint', 'true')
+      if (f === 'income')  params.set('type', 'income')
+      if (f === 'expense') params.set('type', 'expense')
       const data = await api.get(`/transactions?${params}`)
       setTxns(off === 0 ? data.data : prev => [...prev, ...data.data])
       setCount(data.count)
@@ -36,11 +44,11 @@ export default function TransactionsPage() {
       <div style={{ fontSize:13, color:'var(--muted)', marginBottom:20 }}>{count} total</div>
 
       <div style={{ display:'flex', gap:6, marginBottom:20, flexWrap:'wrap' }}>
-        {['all','joint','income'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
+        {FILTERS.map(({ key, label }) => (
+          <button key={key} onClick={() => setFilter(key)}
             className="btn btn-sm"
-            style={{ background: filter === f ? 'var(--bg4)' : 'transparent', color: filter === f ? 'var(--text)' : 'var(--muted)', border:'0.5px solid var(--border2)' }}>
-            {f.charAt(0).toUpperCase() + f.slice(1)}
+            style={{ background: filter === key ? 'var(--bg4)' : 'transparent', color: filter === key ? 'var(--text)' : 'var(--muted)', border:'0.5px solid var(--border2)' }}>
+            {label}
           </button>
         ))}
       </div>

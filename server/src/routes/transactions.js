@@ -6,7 +6,7 @@ export const transactionsRouter = Router()
 transactionsRouter.use(requireAuth)
 
 transactionsRouter.get('/', async (req, res) => {
-  const { account_id, category, is_joint, month, year, limit = 50, offset = 0 } = req.query
+  const { account_id, category, is_joint, type, month, year, limit = 50, offset = 0 } = req.query
   let query = supabase
     .from('transactions')
     .select('*, accounts(name, institution)', { count: 'exact' })
@@ -16,6 +16,7 @@ transactionsRouter.get('/', async (req, res) => {
 
   if (account_id) query = query.eq('account_id', account_id)
   if (category) query = query.eq('category', category)
+  if (type) query = query.eq('type', type)
   if (is_joint !== undefined) query = query.eq('is_joint', is_joint === 'true')
   if (month && year) {
     const start = `${year}-${String(month).padStart(2, '0')}-01`
