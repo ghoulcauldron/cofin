@@ -38,4 +38,4 @@ env/
 .supabase/
 
 tests/
-*.csv
+*.csv.claude/
