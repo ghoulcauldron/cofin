@@ -1,6 +1,22 @@
 // Flexible CSV parser — handles most bank CSV exports
 // Detects column positions by header name matching
 
+function normalizeDate(raw) {
+  if (!raw) return raw
+  // Already ISO yyyy-MM-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+  // M/D/YYYY or MM/DD/YYYY
+  const mdy4 = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (mdy4) return `${mdy4[3]}-${mdy4[1].padStart(2, '0')}-${mdy4[2].padStart(2, '0')}`
+  // M/D/YY or MM/DD/YY
+  const mdy2 = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
+  if (mdy2) return `20${mdy2[3]}-${mdy2[1].padStart(2, '0')}-${mdy2[2].padStart(2, '0')}`
+  // M-D-YYYY or MM-DD-YYYY
+  const mdy4d = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/)
+  if (mdy4d) return `${mdy4d[3]}-${mdy4d[1].padStart(2, '0')}-${mdy4d[2].padStart(2, '0')}`
+  return raw
+}
+
 function col(row, headers, ...names) {
   for (const name of names) {
     const idx = headers.findIndex(h => h.includes(name))
@@ -59,7 +75,7 @@ export async function parseCsv(text, institution) {
     if (amount === 0) continue
 
     transactions.push({
-      date: dateRaw,
+      date: normalizeDate(dateRaw),
       description,
       amount,
       type,
