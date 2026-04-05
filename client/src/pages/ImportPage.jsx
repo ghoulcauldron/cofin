@@ -5,15 +5,11 @@ import { useNavigate } from 'react-router-dom'
 const INSTITUTIONS = ['generic','chase','amex','bofa','citi','wellsfargo']
 
 const CATEGORIES = [
-  // Spending
   'Groceries','Dining','Transportation','Utilities','Rent/Mortgage',
   'Entertainment','Shopping','Health','Travel','Subscriptions',
   'Insurance','Personal Care','Education','Pets',
-  // Money movement
-  'CC Payment','Transfer','P2P Transfer','ATM/Cash',
-  // Income
+  'CC Payment','Transfer','Cash',
   'Income','Freelance Income','Reimbursement',
-  // Catch-all
   'Uncategorized'
 ]
 
@@ -90,8 +86,8 @@ export default function ImportPage() {
 
     setSaving(true)
     try {
-      const result = await api.post('/transactions/bulk', { transactions: toSave })
-      setDone({ inserted: result.inserted, skipped: result.skipped })
+      await api.post('/transactions/bulk', { transactions: toSave })
+      setDone(true)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -110,18 +106,14 @@ export default function ImportPage() {
 
   // ── Done screen ─────────────────────────────────────────────
   if (done) {
+    const saved = reviewed.filter(r => r._include).length
     return (
       <div style={{ padding:'40px 20px', maxWidth:600, margin:'0 auto', textAlign:'center' }} className="animate-fadeUp">
         <div style={{ fontSize:48, marginBottom:16 }}>✓</div>
         <div style={{ fontFamily:'var(--serif)', fontSize:24, marginBottom:8 }}>
-          {done.inserted} transaction{done.inserted !== 1 ? 's' : ''} imported
+          {saved} transactions imported
         </div>
-        {done.skipped > 0 && (
-          <div style={{ fontSize:13, color:'var(--muted)', marginBottom:8 }}>
-            {done.skipped} duplicate{done.skipped !== 1 ? 's' : ''} skipped
-          </div>
-        )}
-        <div style={{ fontSize:14, color:'var(--muted)', marginBottom:32, marginTop:8 }}>
+        <div style={{ fontSize:14, color:'var(--muted)', marginBottom:32 }}>
           They're now in your transaction list, ready for categorisation.
         </div>
         <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>
@@ -267,48 +259,33 @@ export default function ImportPage() {
             </div>
           )}
 
-          {/* Select all + bulk edit toolbar */}
-          <div style={{ display:'flex', gap:12, marginBottom:12, fontSize:12, color:'var(--muted)', flexWrap:'wrap', alignItems:'center' }}>
+          {/* Needs review banner */}
+          {reviewed.some(r => r.needs_review) && (
+            <div style={{ marginBottom:12, padding:'12px 16px', background:'rgba(200,184,154,0.1)', border:'0.5px solid rgba(200,184,154,0.3)', borderRadius:10, fontSize:13, color:'var(--accent)', display:'flex', gap:10, alignItems:'flex-start' }}>
+              <span style={{ flexShrink:0 }}>⚠</span>
+              <span>
+                <strong>PDF bold-text limitation:</strong> Chase uses bold for deposits — bold formatting is lost in PDF extraction.
+                Rows marked <span style={{ background:'rgba(200,184,154,0.2)', borderRadius:4, padding:'1px 6px', fontSize:11 }}>verify</span> may have incorrect type or amount.
+                Click the amount to toggle expense ↔ income, and edit the value directly.
+              </span>
+            </div>
+          )}
+
+          {/* Select all */}
+          <div style={{ display:'flex', gap:12, marginBottom:12, fontSize:12, color:'var(--muted)' }}>
             <button className="btn btn-sm btn-ghost" onClick={() => setReviewed(prev => prev.map(r => ({ ...r, _include: true })))}>Select all</button>
             <button className="btn btn-sm btn-ghost" onClick={() => setReviewed(prev => prev.map(r => ({ ...r, _include: false })))}>Deselect all</button>
-            <span style={{ width:'0.5px', height:16, background:'var(--border2)', alignSelf:'center' }} />
-            {/* Bulk category */}
-            <select
-              defaultValue=""
-              onChange={e => {
-                if (!e.target.value) return
-                const cat = e.target.value
-                setReviewed(prev => prev.map(r => r._include ? { ...r, category: cat } : r))
-                e.target.value = ''
-              }}
-              style={{ background:'var(--bg3)', border:'0.5px solid var(--border2)', color:'var(--muted)', fontSize:11, borderRadius:6, padding:'3px 8px', outline:'none', cursor:'pointer' }}
-            >
-              <option value="" disabled>Set category for selected…</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            {/* Bulk joint */}
-            <button
-              className="btn btn-sm btn-ghost"
-              onClick={() => setReviewed(prev => {
-                const anyJoint = prev.some(r => r._include && r.is_joint)
-                return prev.map(r => r._include ? { ...r, is_joint: !anyJoint } : r)
-              })}
-              style={{ display:'flex', alignItems:'center', gap:5 }}
-            >
-              <span style={{ width:10, height:10, borderRadius:2, background:'var(--accent2)', display:'inline-block', opacity:0.8 }} />
-              Toggle joint for selected
-            </button>
             <span style={{ marginLeft:'auto', alignSelf:'center' }}>{reviewed.filter(r => r._include).length} selected</span>
           </div>
 
           <div className="card" style={{ overflow:'hidden' }}>
             {/* Table header */}
-            <div style={{ display:'grid', gridTemplateColumns:'28px 90px 1fr 120px 90px 70px', gap:12, padding:'10px 16px', fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', borderBottom:'0.5px solid var(--border)' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'28px 90px 1fr 120px 110px 60px', gap:12, padding:'10px 16px', fontSize:10, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase', borderBottom:'0.5px solid var(--border)' }}>
               <span></span>
               <span>Date</span>
               <span>Description</span>
               <span>Category</span>
-              <span style={{ textAlign:'right' }}>Amount</span>
+              <span style={{ textAlign:'right' }}>Amount · Type</span>
               <span>Joint</span>
             </div>
 
@@ -316,9 +293,10 @@ export default function ImportPage() {
             <div style={{ maxHeight:'60vh', overflowY:'auto' }}>
               {reviewed.map(row => (
                 <div key={row._id} style={{
-                  display:'grid', gridTemplateColumns:'28px 90px 1fr 120px 90px 70px',
+                  display:'grid', gridTemplateColumns:'28px 90px 1fr 120px 110px 60px',
                   gap:12, padding:'9px 16px', alignItems:'center',
                   borderBottom:'0.5px solid var(--border)',
+                  background: row.needs_review ? 'rgba(200,184,154,0.04)' : 'transparent',
                   opacity: row._include ? 1 : 0.35,
                   transition:'opacity 0.15s',
                   fontSize:12,
@@ -352,9 +330,28 @@ export default function ImportPage() {
                   >
                     {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
-                  {/* Amount */}
-                  <div style={{ textAlign:'right', fontWeight:500 }} className={row.type === 'income' ? 'pos' : 'neg'}>
-                    {row.type === 'income' ? '+' : '−'}{fmt(row.amount)}
+                  {/* Amount + type toggle */}
+                  <div style={{ textAlign:'right' }}>
+                    {row.needs_review && (
+                      <span style={{ fontSize:9, background:'rgba(200,184,154,0.2)', color:'var(--accent)', borderRadius:4, padding:'1px 5px', marginRight:4 }}>verify</span>
+                    )}
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}>
+                      <input
+                        type="number"
+                        value={row.amount}
+                        onChange={e => updateRow(row._id, 'amount', Math.abs(parseFloat(e.target.value) || 0))}
+                        style={{ background:'transparent', border:'none', color: row.type === 'income' ? 'var(--income)' : 'var(--expense)', fontSize:12, fontWeight:500, width:72, textAlign:'right', outline:'none' }}
+                        step="0.01"
+                        min="0"
+                      />
+                      <button
+                        onClick={() => updateRow(row._id, 'type', row.type === 'income' ? 'expense' : 'income')}
+                        title="Toggle expense / income"
+                        style={{ background:'transparent', border:'none', cursor:'pointer', fontSize:10, color: row.type === 'income' ? 'var(--income)' : 'var(--expense)', padding:'2px 4px', borderRadius:4, lineHeight:1 }}
+                      >
+                        {row.type === 'income' ? '+' : '−'}
+                      </button>
+                    </div>
                   </div>
                   {/* Joint toggle */}
                   <label style={{ display:'flex', alignItems:'center', gap:5, cursor:'pointer' }}>

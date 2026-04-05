@@ -26,128 +26,155 @@ function detectYear(text) {
   return m2 ? parseInt(m2[1]) : new Date().getFullYear()
 }
 
-// ─── Reference number stripper ─────────────────────────────────────────────
-// Chase embeds these in transaction lines — they look like numbers but aren't amounts:
-//   PPD ID: 3260302465   CCD ID: 2462467002   Web ID: Intfitrvos
-//   account refs like 90496401420256 (>8 digits, no decimal)
-//   card refs like "Card 9929"
-function stripReferenceNoise(str) {
+// ─── Chase-specific amount extraction ─────────────────────────────────────
+// Chase PDFs concatenate amounts and balances with no separator:
+//   -133.795,992.16 = amount(-133.79) + balance(5,992.16)
+// They also glue reference numbers to amounts:
+//   32603024654,557.19 = ref(3260302465) + amount(4,557.19)
+// Strategy: insert spaces at these boundaries, then extract clean amounts.
+
+function separateChaseNumbers(str) {
   return str
-    .replace(/\b(PPD|CCD|Web|ACH)\s+ID:\s*\S+/gi, '')   // PPD ID: 3260302465
-    .replace(/\bCard\s+\d{4}\b/gi, '')                    // Card 9929
-    .replace(/\b\d{9,}\b/g, '')                           // long digit strings (account/ref numbers)
-    .replace(/\bRef:\s*\S+/gi, '')                         // Ref: 1799205702-NV...
-    .replace(/\bTrn:\s*\S+/gi, '')                         // Trn: 2280272086Gb
-    .replace(/\bBref:\s*\S+/gi, '')                        // Bref: 2A1Afd6B-...
-    .replace(/\bIid:\s*\S+/gi, '')                         // Iid: 20260327...
-    .replace(/\bRecd:\s*\S+/gi, '')                        // Recd: 18:19:26
-    .replace(/\s+/g, ' ')
-    .trim()
+    // Ref number (6+ digits) immediately followed by comma-separated amount: "32603024654,557.19"
+    .replace(/(\d{6,})(\d(?:,\d{3})+\.\d{2})/g, '$1 $2')
+    // Ref number immediately followed by negative amount: "2462467002-133.79"
+    .replace(/(\d{6,})(-\d)/g, '$1 $2')
+    // Ref number immediately followed by small amount (no comma): "ref114.59"
+    .replace(/(\d{6,})(\d{1,3}\.\d{2})(?!\d)/g, '$1 $2')
+    // Amount immediately followed by balance (decimal boundary): "-133.795,992.16"
+    .replace(/(\.\d{2})(\d)/g, '$1 $2')
+}
+
+function extractChaseAmounts(str) {
+  const separated = separateChaseNumbers(str)
+  const results = []
+  const re = /-?(?:\d{1,3},)*\d+\.\d{2}(?!\d)/g
+  let m
+  while ((m = re.exec(separated)) !== null) {
+    const val = parseFloat(m[0].replace(/,/g,''))
+    if (!isNaN(val) && Math.abs(val) > 0) {
+      results.push({ val, raw: m[0], idx: m.index })
+    }
+  }
+  return results
+}
+
+// Strip reference/routing noise from Chase lines.
+// KEY: strip ID labels only ("PPD ID: "), not the values —
+// the digit values get handled by separateChaseNumbers().
+function stripChaseNoise(block) {
+  return block
+    .replace(/\b(PPD|CCD|Web|ACH)\s+ID:\s*/gi, '')    // strip label, leave digits for separator
+    .replace(/\bCard\s+\d{4}\b/gi, '')                  // "Card 9929"
+    .replace(/\bRef:\s*\S+/gi, '')
+    .replace(/\bTrn:\s*\S+/gi, '')
+    .replace(/\bBref:\s*\S+/gi, '')
+    .replace(/\bIid:\s*\S+/gi, '')
+    .replace(/\bRecd:\s*[\d:]+/gi, '')
+    .replace(/\bFrom:\s*\S+/gi, '')
+    .replace(/\bInfo:\s*/gi, '')
+    .replace(/\bVia\s+\S+/gi, '')
+    .replace(/\b[A-Z][A-Z0-9]{7,}\b/g, '')             // long alphanumeric reference codes
+    .replace(/\s+/g, ' ').trim()
 }
 
 // ─── Transaction subtype classifier ───────────────────────────────────────
-// Classifies checking account transactions so CC payments etc. are flagged
-function classifySubtype(description, amount, type) {
+function classifySubtype(description) {
   const d = description.toLowerCase()
+  if (/american express|amex|citi card|discover|capital one|ccpymt|cc pymt|payment to chase card|robinhood card payment/i.test(d)) return 'cc_payment'
+  if (/schwab|fidelity|vanguard|wells fargo ifi|dda to dda/i.test(d)) return 'transfer'
+  if (/venmo|zelle|cashapp/i.test(d)) return 'p2p_transfer'
+  if (/paypal/i.test(d)) return 'p2p_transfer'
+  if (/payroll|direct deposit/i.test(d)) return 'payroll'
+  if (/atm|cash withdrawal/i.test(d)) return 'atm'
+  if (/real time transfer|wire/i.test(d)) return 'wire'
+  if (/tmobile|t-mobile|at&t|verizon|comcast|spectrum|con ed|coned|electric|water|gas/i.test(d)) return 'bill'
+  return 'debit'
+}
 
-  // Credit card payments — inter-account transfer, not spend
-  if (/american express|amex.*pmt|citi.*payment|discover.*payment|chase.*payment|capital one.*payment|cc.*pymt|ccpymt/i.test(description)) {
-    return 'cc_payment'
+function subtypeToCategory(subtype, type) {
+  const map = {
+    payroll:      'Income',
+    wire:         type === 'income' ? 'Income' : 'Transfer',
+    cc_payment:   'CC Payment',
+    transfer:     'Transfer',
+    p2p_transfer: 'Transfer',
+    atm:          'Cash',
+    bill:         'Utilities',
+    debit:        'Uncategorized'
   }
-  // Bank transfers
-  if (/transfer|dda to dda|schwab|fidelity|vanguard|wells fargo ifi/i.test(d)) {
-    return 'transfer'
-  }
-  // Venmo / Zelle / PayPal — could be reimbursement, flag for review
-  if (/venmo|zelle|paypal|cashapp|cash app/i.test(d)) {
-    return 'p2p_transfer'
-  }
-  // Payroll / direct deposit
-  if (/payroll|direct deposit|payroll|salary/i.test(d)) {
-    return 'payroll'
-  }
-  // ATM
-  if (/atm|cash withdrawal/i.test(d)) {
-    return 'atm'
-  }
-  // Regular debit / subscription
-  return type === 'income' ? 'deposit' : 'debit'
+  return map[subtype] || 'Uncategorized'
 }
 
 // ─── Chase checking/savings parser ────────────────────────────────────────
 function parseChase(text) {
   const year = detectYear(text)
   const transactions = []
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
 
-  // Work within transaction detail section only
-  const startMarker = text.indexOf('TRANSACTION DETAIL')
-  const section = startMarker !== -1 ? text.slice(startMarker) : text
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
 
-  // Split on MM/DD pattern glued to start of description (no space between date and text)
-  const txPattern = /(\d{2}\/\d{2})([A-Z][^\n]+(?:\n(?!\d{2}\/\d{2})[^\n]*)*)/g
+    // Chase transaction lines: MM/DD glued directly to description (no space)
+    const dateMatch = line.match(/^(\d{2}\/\d{2})([A-Z0-9].*)/)
+    if (!dateMatch) continue
 
-  let match
-  while ((match = txPattern.exec(section)) !== null) {
-    const date = match[1]
+    const date = dateMatch[1]
+    let block = dateMatch[2]
 
-    // Join multi-line blocks, collapse whitespace
-    const rawBlock = match[2].replace(/\n/g, ' ').replace(/\s+/g, ' ').trim()
-
-    // Skip header/summary lines
-    if (/^(DATE|DESCRIPTION|AMOUNT|BALANCE|Beginning|Ending|Deposits|ATM &|Electronic|CHECKING|IN CASE|JPMorgan|Service)/i.test(rawBlock)) continue
-
-    // Strip reference noise BEFORE amount extraction
-    const cleanBlock = stripReferenceNoise(rawBlock)
-
-    // Now extract dollar amounts — these are the only real numbers left
-    // Chase format: description then AMOUNT then BALANCE on same line
-    // e.g. "Con Ed of NY Cecony Cecony -133.795,992.16"
-    //       amount = -133.79, balance = 5,992.16
-    const amounts = []
-    const amtRegex = /-?[\d,]*\d{1,3}(?:,\d{3})*\.\d{2}(?!\d)/g
-    let amtMatch
-    while ((amtMatch = amtRegex.exec(cleanBlock)) !== null) {
-      const val = parseAmount(amtMatch[0])
-      if (!isNaN(val)) {
-        amounts.push({ val, raw: amtMatch[0], idx: amtMatch.index })
-      }
+    // Collect continuation lines (multi-line transactions like wire transfers)
+    for (let j = i + 1; j < Math.min(i + 6, lines.length); j++) {
+      const next = lines[j]
+      if (/^\d{2}\/\d{2}[A-Z0-9]/.test(next)) break
+      if (/^(IN CASE|For personal|For business|JPMorgan|CHECKING|TRANSACTION DETAIL|Beginning|Ending|\*start\*|\*end\*|Call us|We must|Your name|We accept)/.test(next)) break
+      // Stop if continuation is long boilerplate with no amounts
+      if (next.length > 100 && !/\d+\.\d{2}/.test(next)) break
+      block += ' ' + next
     }
 
+    block = block.replace(/\s+/g, ' ').trim()
+
+    // Hard cap — scooped boilerplate
+    if (block.length > 300) continue
+
+    const clean = stripChaseNoise(block)
+    const amounts = extractChaseAmounts(clean)
     if (amounts.length === 0) continue
 
-    // Second-to-last = transaction amount, last = running balance
-    // If only one number found, it is the transaction amount
+    // Second-to-last amount = transaction, last = running balance
     const txAmt = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[amounts.length - 1]
     const amount = txAmt.val
     const absAmount = Math.abs(amount)
     if (absAmount === 0) continue
 
-    // Description = everything in cleanBlock before the transaction amount position
-    let description = cleanBlock.slice(0, txAmt.idx).trim()
-    description = description.replace(/\s+/g, ' ').trim()
-    if (!description || description.length < 2) continue
+    // Description = everything before the transaction amount in the separated string
+    const separated = separateChaseNumbers(clean)
+    const rawIdx = separated.indexOf(txAmt.raw)
+    let description = rawIdx > 0 ? separated.slice(0, rawIdx).trim() : separated
+    // Strip bare long digit sequences remaining in description
+    description = description.replace(/\b\d{6,}\b/g, '').replace(/\s+/g, ' ').trim()
+
+    if (!description || description.length < 3) continue
+    if (/^(DATE|AMOUNT|BALANCE)$/i.test(description)) continue
 
     const type = amount < 0 ? 'expense' : 'income'
-    const subtype = classifySubtype(description, absAmount, type)
-
-    // Auto-categorise based on subtype
-    let category = 'Uncategorized'
-    if (subtype === 'payroll') category = 'Income'
-    if (subtype === 'cc_payment') category = 'CC Payment'
-    if (subtype === 'transfer') category = 'Transfer'
-    if (subtype === 'p2p_transfer') category = 'Transfer'
-    if (subtype === 'atm') category = 'Cash'
+    const subtype = classifySubtype(description)
+    // Chase uses bold text for deposits — bold is lost in PDF extraction.
+    // Any positive amount with no explicit negative sign is ambiguous.
+    // Flag for user review so they can verify type and amount.
+    const needsReview = !txAmt.raw.startsWith('-') && subtype !== 'payroll' && subtype !== 'wire'
 
     transactions.push({
       date: normalizeDate(date, year),
       description,
       amount: absAmount,
       type,
-      category,
+      category: subtypeToCategory(subtype, type),
       subtype,
+      needs_review: needsReview,
       source: 'pdf',
       institution: 'chase',
-      raw: rawBlock
+      raw: block
     })
   }
 
@@ -155,7 +182,6 @@ function parseChase(text) {
 }
 
 // ─── Amex credit card parser ───────────────────────────────────────────────
-// All Amex statement lines are charges (expenses) — payments appear as credits
 function parseAmex(text) {
   const year = detectYear(text)
   const transactions = []
@@ -164,13 +190,13 @@ function parseAmex(text) {
   while ((match = regex.exec(text)) !== null) {
     const description = match[2].trim().replace(/\s+/g, ' ')
     const amount = parseAmount(match[3])
-    const subtype = classifySubtype(description, amount, 'expense')
+    const subtype = classifySubtype(description)
     transactions.push({
       date: normalizeDate(match[1], year),
       description,
       amount,
       type: 'expense',
-      category: 'Uncategorized',
+      category: subtypeToCategory(subtype, 'expense'),
       subtype,
       source: 'pdf',
       institution: 'amex',
@@ -190,13 +216,14 @@ function parseBofa(text) {
     const amount = parseAmount(match[3])
     const description = match[2].trim().replace(/\s+/g, ' ')
     const type = amount < 0 ? 'expense' : 'income'
+    const subtype = classifySubtype(description)
     transactions.push({
       date: normalizeDate(match[1], year),
       description,
       amount: Math.abs(amount),
       type,
-      category: 'Uncategorized',
-      subtype: classifySubtype(description, Math.abs(amount), type),
+      category: subtypeToCategory(subtype, type),
+      subtype,
       source: 'pdf',
       institution: 'bofa',
       raw: match[0].trim()
@@ -214,13 +241,14 @@ function parseCiti(text) {
   while ((match = regex.exec(text)) !== null) {
     const description = match[2].trim().replace(/\s+/g, ' ')
     const amount = parseAmount(match[3])
+    const subtype = classifySubtype(description)
     transactions.push({
       date: normalizeDate(match[1], year),
       description,
       amount,
       type: 'expense',
-      category: 'Uncategorized',
-      subtype: classifySubtype(description, amount, 'expense'),
+      category: subtypeToCategory(subtype, 'expense'),
+      subtype,
       source: 'pdf',
       institution: 'citi',
       raw: match[0].trim()
@@ -239,13 +267,14 @@ function parseWellsFargo(text) {
     const amount = parseAmount(match[3])
     const description = match[2].trim().replace(/\s+/g, ' ')
     const type = amount < 0 ? 'expense' : 'income'
+    const subtype = classifySubtype(description)
     transactions.push({
       date: normalizeDate(match[1], year),
       description,
       amount: Math.abs(amount),
       type,
-      category: 'Uncategorized',
-      subtype: classifySubtype(description, Math.abs(amount), type),
+      category: subtypeToCategory(subtype, type),
+      subtype,
       source: 'pdf',
       institution: 'wellsfargo',
       raw: match[0].trim()
@@ -264,13 +293,14 @@ function parseGeneric(text) {
     const amount = parseAmount(match[3])
     const description = match[2].trim().replace(/\s+/g, ' ')
     const type = amount < 0 ? 'expense' : 'income'
+    const subtype = classifySubtype(description)
     transactions.push({
       date: normalizeDate(match[1], year),
       description,
       amount: Math.abs(amount),
       type,
-      category: 'Uncategorized',
-      subtype: classifySubtype(description, Math.abs(amount), type),
+      category: subtypeToCategory(subtype, type),
+      subtype,
       source: 'pdf',
       institution: 'generic',
       raw: match[0].trim()
