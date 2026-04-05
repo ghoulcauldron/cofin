@@ -70,17 +70,24 @@ transactionsRouter.post('/bulk', async (req, res) => {
 
   // Fetch existing fingerprints for this workspace to detect duplicates explicitly
   const incomingFingerprints = enriched.map(t => t.fingerprint)
-  const { data: existing } = await supabase
+  console.log('[bulk] incoming count:', enriched.length)
+  console.log('[bulk] sample fingerprint:', incomingFingerprints[0])
+
+  const { data: existing, error: lookupError } = await supabase
     .from('transactions')
     .select('fingerprint')
     .eq('workspace_id', workspaceId)
     .in('fingerprint', incomingFingerprints)
+
+  console.log('[bulk] existing matches found:', existing?.length, lookupError?.message)
 
   const existingSet = new Set((existing || []).map(r => r.fingerprint))
 
   // Only insert rows whose fingerprint doesn't already exist
   const toInsert = enriched.filter(t => !existingSet.has(t.fingerprint))
   const skipped = enriched.length - toInsert.length
+
+  console.log('[bulk] toInsert:', toInsert.length, 'skipped:', skipped)
 
   if (toInsert.length === 0) {
     return res.json({ inserted: 0, skipped, data: [] })
@@ -91,9 +98,11 @@ transactionsRouter.post('/bulk', async (req, res) => {
     .insert(toInsert)
     .select()
 
+  console.log('[bulk] insert result:', data?.length, error?.message)
+
   if (error) return res.status(400).json({ error: error.message })
 
-  res.json({ inserted: data.length, skipped, data })
+  res.json({ inserted: data?.length || 0, skipped, data: data || [] })
 })
 
 transactionsRouter.patch('/:id', async (req, res) => {
