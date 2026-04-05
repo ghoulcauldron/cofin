@@ -83,8 +83,8 @@ export default function ImportPage() {
 
     setSaving(true)
     try {
-      await api.post('/transactions/bulk', { transactions: toSave })
-      setDone(true)
+      const result = await api.post('/transactions/bulk', { transactions: toSave })
+      setDone({ inserted: result.inserted, skipped: result.skipped })
     } catch (e) {
       setError(e.message)
     } finally {
@@ -103,14 +103,18 @@ export default function ImportPage() {
 
   // ── Done screen ─────────────────────────────────────────────
   if (done) {
-    const saved = reviewed.filter(r => r._include).length
     return (
       <div style={{ padding:'40px 20px', maxWidth:600, margin:'0 auto', textAlign:'center' }} className="animate-fadeUp">
         <div style={{ fontSize:48, marginBottom:16 }}>✓</div>
         <div style={{ fontFamily:'var(--serif)', fontSize:24, marginBottom:8 }}>
-          {saved} transactions imported
+          {done.inserted} transaction{done.inserted !== 1 ? 's' : ''} imported
         </div>
-        <div style={{ fontSize:14, color:'var(--muted)', marginBottom:32 }}>
+        {done.skipped > 0 && (
+          <div style={{ fontSize:13, color:'var(--muted)', marginBottom:8 }}>
+            {done.skipped} duplicate{done.skipped !== 1 ? 's' : ''} skipped
+          </div>
+        )}
+        <div style={{ fontSize:14, color:'var(--muted)', marginBottom:32, marginTop:8 }}>
           They're now in your transaction list, ready for categorisation.
         </div>
         <div style={{ display:'flex', gap:12, justifyContent:'center', flexWrap:'wrap' }}>

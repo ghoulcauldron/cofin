@@ -47,20 +47,39 @@ transactionsRouter.post('/', async (req, res) => {
   res.json(data)
 })
 
-// Bulk insert after import review
+// Bulk insert after import review — with deduplication
 transactionsRouter.post('/bulk', async (req, res) => {
   const { transactions } = req.body
-  const enriched = transactions.map(t => ({
-    ...t,
-    workspace_id: req.user.user_metadata.workspaceId,
-    created_by: req.user.id,
-    category: t.category || 'Uncategorized',
-    is_joint: t.is_joint || false,
-    source: t.source || 'import'
-  }))
-  const { data, error } = await supabase.from('transactions').insert(enriched).select()
+  const workspaceId = req.user.user_metadata.workspaceId
+
+  const enriched = transactions.map(t => {
+    const fingerprint = Buffer.from(
+      `${workspaceId}|${t.date}|${(t.description || '').toLowerCase().trim()}|${Number(t.amount).toFixed(2)}`
+    ).toString('base64').slice(0, 64)
+    return {
+      ...t,
+      workspace_id: workspaceId,
+      created_by: req.user.id,
+      category: t.category || 'Uncategorized',
+      is_joint: t.is_joint || false,
+      source: t.source || 'import',
+      fingerprint
+    }
+  })
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .upsert(enriched, {
+      onConflict: 'workspace_id,fingerprint',
+      ignoreDuplicates: true
+    })
+    .select()
+
   if (error) return res.status(400).json({ error: error.message })
-  res.json({ inserted: data.length, data })
+
+  const inserted = data?.length || 0
+  const skipped = enriched.length - inserted
+  res.json({ inserted, skipped, data })
 })
 
 transactionsRouter.patch('/:id', async (req, res) => {
