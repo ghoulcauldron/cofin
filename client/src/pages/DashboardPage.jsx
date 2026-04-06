@@ -10,9 +10,9 @@ function fmt(n) {
 
 function StatCard({ label, value, sub, valueClass }) {
   return (
-    <div className="card" style={{ padding:'18px 20px', flex:1, minWidth:0 }}>
+    <div className="card" style={{ padding:'16px', minWidth:0 }}>
       <div style={{ fontSize:10, color:'var(--muted)', letterSpacing:'1px', textTransform:'uppercase', marginBottom:8 }}>{label}</div>
-      <div style={{ fontFamily:'var(--serif)', fontSize:24, lineHeight:1, ...(valueClass ? {} : {}) }} className={valueClass}>{value}</div>
+      <div style={{ fontFamily:'var(--serif)', fontSize:22, lineHeight:1 }} className={valueClass}>{value}</div>
       {sub && <div style={{ fontSize:11, color:'var(--muted)', marginTop:6 }}>{sub}</div>}
     </div>
   )
@@ -51,7 +51,7 @@ export default function DashboardPage() {
   const owes = split?.balances?.find(b => b.owes > 0)
 
   return (
-    <div style={{ padding:'24px 20px', maxWidth:900, margin:'0 auto' }}>
+    <div style={{ padding:'20px 16px', maxWidth:900, margin:'0 auto', boxSizing:'border-box' }}>
       {/* Header */}
       <div style={{ marginBottom:28 }}>
         <div style={{ fontFamily:'var(--serif)', fontSize:28, letterSpacing:'-0.5px' }}>
@@ -64,7 +64,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div style={{ display:'flex', gap:12, flexWrap:'wrap', marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:10, marginBottom:20 }}>
         {loading ? (
           [1,2,3,4].map(i => (
             <div key={i} className="card skeleton" style={{ flex:1, minWidth:140, height:90 }} />

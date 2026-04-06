@@ -12,10 +12,10 @@ const CATEGORIES = [
 ]
 
 const SORT_OPTIONS = [
-  { value: 'date:desc',   label: 'Date — newest first' },
-  { value: 'date:asc',    label: 'Date — oldest first' },
-  { value: 'amount:desc', label: 'Amount — highest first' },
-  { value: 'amount:asc',  label: 'Amount — lowest first' },
+  { value: 'date:desc',   label: 'Newest first' },
+  { value: 'date:asc',    label: 'Oldest first' },
+  { value: 'amount:desc', label: 'Highest amount' },
+  { value: 'amount:asc',  label: 'Lowest amount' },
 ]
 
 function fmt(n) {
@@ -172,7 +172,6 @@ export default function TransactionsPage() {
   const [searchInput, setSearchInput] = useState('')
   const [offset, setOffset] = useState(0)
   const [editing, setEditing] = useState(null)
-  const [showFilters, setShowFilters] = useState(false)
   const searchTimer = useRef(null)
   const limit = 30
 
@@ -188,11 +187,11 @@ export default function TransactionsPage() {
   async function load(off = 0, opts = {}) {
     setLoading(true)
     try {
-      const f      = opts.filter   ?? filter
-      const cat    = opts.category ?? category
-      const sb     = opts.sortBy   ?? sortBy
-      const sd     = opts.sortDir  ?? sortDir
-      const q      = opts.search   ?? search
+      const f  = opts.filter   ?? filter
+      const cat = opts.category ?? category
+      const sb  = opts.sortBy   ?? sortBy
+      const sd  = opts.sortDir  ?? sortDir
+      const q   = opts.search   ?? search
 
       const params = new URLSearchParams({ limit, offset: off, sort_by: sb, sort_dir: sd })
       if (f === 'joint')   params.set('is_joint', 'true')
@@ -208,28 +207,20 @@ export default function TransactionsPage() {
     finally { setLoading(false) }
   }
 
-  // Reload when filters/sort change
   useEffect(() => {
     setOffset(0)
     load(0, { filter, category, sortBy, sortDir, search })
   }, [filter, category, sort, search])
 
-  // Debounce search input
   function handleSearchInput(val) {
     setSearchInput(val)
     clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => {
-      setOffset(0)
-      setSearch(val)
-    }, 350)
+    searchTimer.current = setTimeout(() => { setOffset(0); setSearch(val) }, 350)
   }
 
   function clearFilters() {
-    setFilter('all')
-    setCategory('')
-    setSort('date:desc')
-    setSearch('')
-    setSearchInput('')
+    setFilter('all'); setCategory(''); setSort('date:desc')
+    setSearch(''); setSearchInput('')
   }
 
   const hasActiveFilters = filter !== 'all' || category || sort !== 'date:desc' || search
@@ -246,110 +237,115 @@ export default function TransactionsPage() {
   }, [])
 
   return (
-    <div style={{ padding:'24px 20px', maxWidth:900, margin:'0 auto' }}>
+    <div style={{ padding:'20px 16px', maxWidth:900, margin:'0 auto', boxSizing:'border-box' }}>
+      <style>{`
+        @media (max-width: 767px) {
+          .tx-filter-row { flex-direction: column !important; align-items: stretch !important; }
+          .tx-filter-pills { flex-wrap: wrap; }
+          .tx-filter-selects { display: grid !important; grid-template-columns: 1fr 1fr; gap: 8px; }
+          .tx-divider { display: none !important; }
+          .tx-row-desc { max-width: 160px !important; }
+        }
+      `}</style>
+
       {/* Header */}
-      <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:8 }}>
-        <div>
-          <div style={{ fontFamily:'var(--serif)', fontSize:26, letterSpacing:'-0.5px' }}>Transactions</div>
-          <div style={{ fontSize:13, color:'var(--muted)', marginTop:2 }}>{count} {search ? `matching "${search}"` : 'total'}</div>
+      <div style={{ marginBottom:16 }}>
+        <div style={{ fontFamily:'var(--serif)', fontSize:24, letterSpacing:'-0.5px' }}>Transactions</div>
+        <div style={{ fontSize:13, color:'var(--muted)', marginTop:2 }}>
+          {count} {search ? `matching "${search}"` : 'total'}
         </div>
       </div>
 
-      {/* Search bar */}
-      <div style={{ position:'relative', marginBottom:14 }}>
+      {/* Search */}
+      <div style={{ position:'relative', marginBottom:12 }}>
         <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'var(--subtle)', fontSize:14, pointerEvents:'none' }}>⌕</span>
         <input
           value={searchInput}
           onChange={e => handleSearchInput(e.target.value)}
           placeholder="Search transactions…"
-          style={{ width:'100%', background:'var(--bg2)', border:'0.5px solid var(--border2)', borderRadius:10, padding:'10px 36px 10px 36px', fontSize:14, color:'var(--text)', outline:'none', fontFamily:'var(--sans)' }}
+          style={{ width:'100%', background:'var(--bg2)', border:'0.5px solid var(--border2)', borderRadius:10, padding:'10px 36px', fontSize:14, color:'var(--text)', outline:'none', fontFamily:'var(--sans)', boxSizing:'border-box' }}
           onFocus={e => e.target.style.borderColor = 'var(--accent)'}
           onBlur={e => e.target.style.borderColor = 'var(--border2)'}
         />
         {searchInput && (
-          <button onClick={() => { setSearchInput(''); setSearch('') }} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:16, lineHeight:1 }}>×</button>
+          <button onClick={() => { setSearchInput(''); setSearch('') }}
+            style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:16, lineHeight:1 }}>×</button>
         )}
       </div>
 
-      {/* Filter row */}
-      <div style={{ display:'flex', gap:6, marginBottom:14, alignItems:'center', flexWrap:'wrap' }}>
-        {/* Type filters */}
-        {FILTERS.map(({ key, label }) => (
-          <button key={key} onClick={() => setFilter(key)} className="btn btn-sm"
-            style={{ background: filter === key ? 'var(--bg4)' : 'transparent', color: filter === key ? 'var(--text)' : 'var(--muted)', border:'0.5px solid var(--border2)' }}>
-            {label}
-          </button>
-        ))}
+      {/* Filters */}
+      <div className="tx-filter-row" style={{ display:'flex', gap:8, marginBottom:14, alignItems:'center' }}>
+        {/* Type pills */}
+        <div className="tx-filter-pills" style={{ display:'flex', gap:6 }}>
+          {FILTERS.map(({ key, label }) => (
+            <button key={key} onClick={() => setFilter(key)} className="btn btn-sm"
+              style={{ background: filter === key ? 'var(--bg4)' : 'transparent', color: filter === key ? 'var(--text)' : 'var(--muted)', border:'0.5px solid var(--border2)', whiteSpace:'nowrap' }}>
+              {label}
+            </button>
+          ))}
+        </div>
 
-        <div style={{ width:'0.5px', height:16, background:'var(--border2)', margin:'0 4px' }} />
+        <div className="tx-divider" style={{ width:'0.5px', height:16, background:'var(--border2)', flexShrink:0 }} />
 
-        {/* Sort */}
-        <select
-          value={sort}
-          onChange={e => setSort(e.target.value)}
-          style={{ background:'var(--bg2)', border:'0.5px solid var(--border2)', borderRadius:8, padding:'5px 10px', fontSize:12, color:'var(--muted)', outline:'none', cursor:'pointer', fontFamily:'var(--sans)' }}
-        >
-          {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        {/* Sort + Category dropdowns */}
+        <div className="tx-filter-selects" style={{ display:'flex', gap:8, flex:1 }}>
+          <select value={sort} onChange={e => setSort(e.target.value)}
+            style={{ flex:1, minWidth:0, background:'var(--bg2)', border:'0.5px solid var(--border2)', borderRadius:8, padding:'6px 10px', fontSize:12, color:'var(--muted)', outline:'none', cursor:'pointer', fontFamily:'var(--sans)' }}>
+            {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
 
-        {/* Category filter */}
-        <select
-          value={category}
-          onChange={e => setCategory(e.target.value)}
-          style={{ background:'var(--bg2)', border:`0.5px solid ${category ? 'var(--accent)' : 'var(--border2)'}`, borderRadius:8, padding:'5px 10px', fontSize:12, color: category ? 'var(--text)' : 'var(--muted)', outline:'none', cursor:'pointer', fontFamily:'var(--sans)' }}
-        >
-          <option value="">All categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
+          <select value={category} onChange={e => setCategory(e.target.value)}
+            style={{ flex:1, minWidth:0, background:'var(--bg2)', border:`0.5px solid ${category ? 'var(--accent)' : 'var(--border2)'}`, borderRadius:8, padding:'6px 10px', fontSize:12, color: category ? 'var(--text)' : 'var(--muted)', outline:'none', cursor:'pointer', fontFamily:'var(--sans)' }}>
+            <option value="">All categories</option>
+            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
 
-        {/* Clear filters */}
         {hasActiveFilters && (
-          <button onClick={clearFilters} style={{ marginLeft:'auto', background:'none', border:'none', color:'var(--muted)', fontSize:12, cursor:'pointer', padding:'4px 8px', borderRadius:6, fontFamily:'var(--sans)' }}>
+          <button onClick={clearFilters}
+            style={{ flexShrink:0, background:'none', border:'none', color:'var(--muted)', fontSize:12, cursor:'pointer', padding:'4px 8px', borderRadius:6, fontFamily:'var(--sans)', whiteSpace:'nowrap' }}>
             Clear ×
           </button>
         )}
       </div>
 
-      {/* Transaction list */}
+      {/* List */}
       <div className="card" style={{ overflow:'hidden' }}>
         {loading && txns.length === 0 ? (
           [1,2,3,4,5].map(i => (
-            <div key={i} style={{ display:'flex', gap:12, padding:'12px 20px', borderBottom:'0.5px solid var(--border)' }}>
+            <div key={i} style={{ display:'flex', gap:10, padding:'12px 16px', borderBottom:'0.5px solid var(--border)' }}>
               <div className="skeleton" style={{ width:32, height:32, borderRadius:8, flexShrink:0 }} />
               <div style={{ flex:1 }}>
                 <div className="skeleton" style={{ height:13, width:'55%', marginBottom:6 }} />
                 <div className="skeleton" style={{ height:11, width:'35%' }} />
               </div>
-              <div className="skeleton" style={{ width:70, height:13 }} />
+              <div className="skeleton" style={{ width:60, height:13, flexShrink:0 }} />
             </div>
           ))
         ) : txns.length === 0 ? (
-          <div style={{ padding:'48px 20px', textAlign:'center', color:'var(--muted)' }}>
+          <div style={{ padding:'48px 16px', textAlign:'center', color:'var(--muted)' }}>
             <div style={{ fontSize:24, marginBottom:12 }}>◎</div>
             <div style={{ fontSize:14, marginBottom:8 }}>No transactions found</div>
             {hasActiveFilters && <button onClick={clearFilters} className="btn btn-ghost btn-sm">Clear filters</button>}
           </div>
         ) : (
           txns.map(tx => (
-            <div
-              key={tx.id}
-              onClick={() => setEditing(tx)}
-              style={{ display:'flex', alignItems:'center', gap:12, padding:'11px 20px', borderBottom:'0.5px solid var(--border)', cursor:'pointer', transition:'background 0.1s' }}
+            <div key={tx.id} onClick={() => setEditing(tx)}
+              style={{ display:'flex', alignItems:'center', gap:10, padding:'11px 16px', borderBottom:'0.5px solid var(--border)', cursor:'pointer', transition:'background 0.1s', minWidth:0 }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              <div style={{ width:32, height:32, borderRadius:8, background:'var(--bg4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, flexShrink:0 }}>
+              <div style={{ width:30, height:30, borderRadius:8, background:'var(--bg4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, flexShrink:0 }}>
                 {txIcon(tx)}
               </div>
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {tx.description}
                   {tx.is_joint && <span className="pill pill-joint" style={{ marginLeft:6, fontSize:9 }}>joint</span>}
-                  {tx.source !== 'manual' && <span className="pill pill-manual" style={{ marginLeft:4, fontSize:9 }}>{tx.source}</span>}
                 </div>
                 <div style={{ fontSize:11, color:'var(--muted)', marginTop:1 }}>{tx.category}</div>
               </div>
-              <div style={{ textAlign:'right', flexShrink:0 }}>
+              <div style={{ textAlign:'right', flexShrink:0, minWidth:72 }}>
                 <div style={{ fontSize:13, fontWeight:500 }} className={tx.type === 'income' ? 'pos' : ''}>
                   {tx.type === 'income' ? '+' : '−'}{fmt(tx.amount)}
                 </div>
