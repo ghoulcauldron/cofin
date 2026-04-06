@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { createHash } from 'crypto'
 import { supabase } from '../services/supabase.js'
 import { requireAuth } from '../middleware/auth.js'
 
@@ -56,7 +57,7 @@ transactionsRouter.post('/bulk', async (req, res) => {
   // Generate fingerprints for all incoming transactions
   const enriched = transactions.map(t => {
     const raw = `${workspaceId}|${t.date}|${(t.description || '').toLowerCase().trim()}|${Number(t.amount).toFixed(2)}`
-    const fingerprint = Buffer.from(raw).toString('base64').slice(0, 32)
+    const fingerprint = createHash('md5').update(raw).digest('hex')
     return {
       ...t,
       workspace_id: workspaceId,
