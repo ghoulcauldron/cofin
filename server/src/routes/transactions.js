@@ -7,18 +7,27 @@ export const transactionsRouter = Router()
 transactionsRouter.use(requireAuth)
 
 transactionsRouter.get('/', async (req, res) => {
-  const { account_id, category, is_joint, type, month, year, limit = 50, offset = 0 } = req.query
+  const {
+    account_id, category, is_joint, type,
+    month, year, search,
+    sort_by = 'date', sort_dir = 'desc',
+    limit = 50, offset = 0
+  } = req.query
+
+  const ascending = sort_dir === 'asc'
+
   let query = supabase
     .from('transactions')
     .select('*, accounts(name, institution)', { count: 'exact' })
     .eq('workspace_id', req.user.user_metadata.workspaceId)
-    .order('date', { ascending: false })
+    .order(sort_by, { ascending })
     .range(Number(offset), Number(offset) + Number(limit) - 1)
 
   if (account_id) query = query.eq('account_id', account_id)
   if (category) query = query.eq('category', category)
   if (type) query = query.eq('type', type)
   if (is_joint !== undefined) query = query.eq('is_joint', is_joint === 'true')
+  if (search) query = query.ilike('description', `%${search}%`)
   if (month && year) {
     const start = `${year}-${String(month).padStart(2, '0')}-01`
     const end = new Date(year, month, 0).toISOString().split('T')[0]
