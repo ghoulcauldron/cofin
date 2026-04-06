@@ -64,7 +64,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat cards */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:10, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:10, marginBottom:20 }}>
         {loading ? (
           [1,2,3,4].map(i => (
             <div key={i} className="card skeleton" style={{ flex:1, minWidth:140, height:90 }} />
@@ -87,8 +87,8 @@ export default function DashboardPage() {
             <button className="btn btn-sm btn-ghost" onClick={() => navigate('/split')}>View details →</button>
           </div>
           {owes ? (
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
-              <div style={{ flex:1, background:'var(--bg3)', borderRadius:10, padding:'14px 16px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr auto 1fr', gap:8, alignItems:'center' }}>
+              <div style={{ background:'var(--bg3)', borderRadius:10, padding:'12px 14px' }}>
                 <div style={{ fontSize:11, color:'var(--muted)', marginBottom:4 }}>owed this cycle</div>
                 <div style={{ fontFamily:'var(--serif)', fontSize:22, color:'var(--income)' }}>+{fmt(owes.owes)}</div>
               </div>
@@ -110,7 +110,7 @@ export default function DashboardPage() {
       <div
         className="card"
         onClick={() => navigate('/import')}
-        style={{ padding:'18px 20px', marginBottom:20, cursor:'pointer', borderStyle:'dashed', borderColor:'var(--border2)', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'border-color 0.2s' }}
+        style={{ padding:'14px 16px', marginBottom:20, cursor:'pointer', borderStyle:'dashed', borderColor:'var(--border2)', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, transition:'border-color 0.2s', flexWrap:'wrap' }}
         onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
         onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border2)'}
       >
@@ -121,7 +121,7 @@ export default function DashboardPage() {
             <div style={{ fontSize:12, color:'var(--muted)', marginTop:2 }}>Drop a PDF, CSV, or paste rows from your bank</div>
           </div>
         </div>
-        <div style={{ display:'flex', gap:6 }}>
+        <div style={{ display:'flex', gap:6, flexShrink:0 }}>
           {['PDF','CSV','PASTE'].map(t => (
             <span key={t} className="pill" style={{ background:'var(--bg3)', color:'var(--muted)', border:'0.5px solid var(--border2)', fontSize:10 }}>{t}</span>
           ))}
@@ -130,7 +130,7 @@ export default function DashboardPage() {
 
       {/* Recent transactions */}
       <div className="card" style={{ overflow:'hidden' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 20px 12px' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'14px 16px 10px', flexWrap:'wrap', gap:8 }}>
           <div style={{ fontSize:11, color:'var(--muted)', letterSpacing:'0.5px', textTransform:'uppercase' }}>Recent</div>
           <button className="btn btn-sm btn-ghost" onClick={() => navigate('/transactions')}>All transactions →</button>
         </div>
