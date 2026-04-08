@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../lib/supabase.js'
 import { format } from 'date-fns'
 import CategorySelect from '../components/CategorySelect.jsx'
+import { useCategories } from '../hooks/useCategories.js'
 
 const SORT_OPTIONS = [
   { value: 'date:desc',   label: 'Newest first' },
@@ -169,6 +170,7 @@ export default function TransactionsPage() {
   const [offset, setOffset] = useState(0)
   const [editing, setEditing] = useState(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const { names: categoryNames } = useCategories()
   const searchTimer = useRef(null)
   const limit = 30
   const [sortBy, sortDir] = sort.split(':')
@@ -288,7 +290,7 @@ export default function TransactionsPage() {
             </select>
             <select value={category} onChange={e => setCategory(e.target.value)} style={selStyle(!!category)}>
               <option value="">All categories</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
@@ -306,7 +308,7 @@ export default function TransactionsPage() {
           </select>
           <select value={category} onChange={e => setCategory(e.target.value)} style={{ ...selStyle(!!category), width:'auto', flex:'0 0 auto' }}>
             <option value="">All categories</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {categoryNames.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           {hasActiveFilters && (
             <button onClick={clearFilters} style={{ background:'none', border:'none', color:'var(--muted)', fontSize:12, cursor:'pointer', padding:'4px 8px', borderRadius:6, fontFamily:'var(--sans)', whiteSpace:'nowrap' }}>Clear ×</button>
