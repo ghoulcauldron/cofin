@@ -9,6 +9,7 @@ import { accountsRouter } from './routes/accounts.js'
 import { splitRouter } from './routes/split.js'
 import { budgetsRouter } from './routes/budgets.js'
 import { categoriesRouter } from './routes/categories.js'
+import { rulesRouter } from './routes/rules.js'
 
 dotenv.config()
 
@@ -34,6 +35,7 @@ app.use('/api/accounts', accountsRouter)
 app.use('/api/split', splitRouter)
 app.use('/api/budgets', budgetsRouter)
 app.use('/api/categories', categoriesRouter)
+app.use('/api/rules', rulesRouter)
 
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))

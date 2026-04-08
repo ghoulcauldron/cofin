@@ -10,6 +10,7 @@ import SplitPage from './pages/SplitPage.jsx'
 import AccountsPage from './pages/AccountsPage.jsx'
 import BudgetsPage from './pages/BudgetsPage.jsx'
 import GoalsPage from './pages/GoalsPage.jsx'
+import CategoriesPage from './pages/CategoriesPage.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuthStore()
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="budgets" element={<BudgetsPage />} />
         <Route path="goals" element={<GoalsPage />} />
+        <Route path="categories" element={<CategoriesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

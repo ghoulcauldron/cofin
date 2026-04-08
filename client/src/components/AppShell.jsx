@@ -21,6 +21,7 @@ const SIDEBAR_NAV = [
   { section: 'Plan', items: [
     { to: '/budgets',      label: 'Budgets',       dot: 'accent' },
     { to: '/goals',        label: 'Goals',         dot: 'accent2' },
+    { to: '/categories',   label: 'Categories',    dot: 'muted' },
   ]},
   { section: 'Import', items: [
     { to: '/import',       label: 'Import data',   dot: 'accent' },

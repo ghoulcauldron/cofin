@@ -33,8 +33,11 @@ export default function ImportPage() {
       fd.append('file', file)
       fd.append('institution', institution)
       const result = await api.upload('/import/upload', fd)
-      setParsed(result)
-      setReviewed(result.transactions.map((t, i) => ({ ...t, _id: i, _include: true })))
+      // Apply merchant rules to pre-categorise before review
+      const ruleResult = await api.post('/rules/apply', { transactions: result.transactions }).catch(() => result)
+      const txns = ruleResult.transactions || result.transactions
+      setParsed({ ...result, transactions: txns })
+      setReviewed(txns.map((t, i) => ({ ...t, _id: i, _include: true })))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -48,8 +51,11 @@ export default function ImportPage() {
     setLoading(true)
     try {
       const result = await api.post('/import/paste', { text: pasteText, institution })
-      setParsed(result)
-      setReviewed(result.transactions.map((t, i) => ({ ...t, _id: i, _include: true })))
+      // Apply merchant rules to pre-categorise before review
+      const ruleResult = await api.post('/rules/apply', { transactions: result.transactions }).catch(() => result)
+      const txns = ruleResult.transactions || result.transactions
+      setParsed({ ...result, transactions: txns })
+      setReviewed(txns.map((t, i) => ({ ...t, _id: i, _include: true })))
     } catch (e) {
       setError(e.message)
     } finally {
