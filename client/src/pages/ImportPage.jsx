@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import { api } from '../lib/supabase.js'
 import { useNavigate } from 'react-router-dom'
 
-const INSTITUTIONS = ['generic','chase','amex','bofa','citi','wellsfargo']
+const INSTITUTIONS = ['generic','chase','chase_sapphire','amex','bofa','citi','wellsfargo']
 
 const CATEGORIES = [
   'Groceries','Dining','Transportation','Utilities','Rent/Mortgage',
