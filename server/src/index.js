@@ -8,6 +8,7 @@ import { importRouter } from './routes/import.js'
 import { accountsRouter } from './routes/accounts.js'
 import { splitRouter } from './routes/split.js'
 import { budgetsRouter } from './routes/budgets.js'
+import { categoriesRouter } from './routes/categories.js'
 
 dotenv.config()
 
@@ -25,13 +26,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'cofin-api' }))
 
-app.get('/api/debug/me', async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1]
-  if (!token) return res.json({ error: 'no token' })
-  const { data: { user }, error } = await supabase.auth.getUser(token)
-  res.json({ user, error })
-})
-
 // Routes
 app.use('/api/auth', authRouter)
 app.use('/api/transactions', transactionsRouter)
@@ -39,6 +33,7 @@ app.use('/api/import', importRouter)
 app.use('/api/accounts', accountsRouter)
 app.use('/api/split', splitRouter)
 app.use('/api/budgets', budgetsRouter)
+app.use('/api/categories', categoriesRouter)
 
 // 404
 app.use((req, res) => res.status(404).json({ error: 'Not found' }))

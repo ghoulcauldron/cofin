@@ -1,15 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../lib/supabase.js'
 import { format } from 'date-fns'
-
-const CATEGORIES = [
-  'Groceries','Dining','Transportation','Utilities','Rent/Mortgage',
-  'Entertainment','Shopping','Health','Travel','Subscriptions',
-  'Insurance','Personal Care','Education','Pets',
-  'CC Payment','Transfer','Cash',
-  'Income','Freelance Income','Reimbursement',
-  'Uncategorized'
-]
+import CategorySelect from '../components/CategorySelect.jsx'
 
 const SORT_OPTIONS = [
   { value: 'date:desc',   label: 'Newest first' },
@@ -124,9 +116,10 @@ function EditDrawer({ tx, onClose, onSave, onDelete }) {
 
           <div style={{ marginBottom:16 }}>
             <label style={lbl}>Category</label>
-            <select style={{ ...inp, appearance:'none', cursor:'pointer' }} value={form.category} onChange={e => set('category', e.target.value)}>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <CategorySelect
+              value={form.category}
+              onChange={name => set('category', name)}
+            />
           </div>
 
           <div style={{ marginBottom:16 }}>

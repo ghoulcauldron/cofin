@@ -1,17 +1,9 @@
 import { useState, useRef, useCallback } from 'react'
 import { api } from '../lib/supabase.js'
 import { useNavigate } from 'react-router-dom'
+import CategorySelect from '../components/CategorySelect.jsx'
 
 const INSTITUTIONS = ['generic','chase','chase_sapphire','amex','bofa','citi','wellsfargo']
-
-const CATEGORIES = [
-  'Groceries','Dining','Transportation','Utilities','Rent/Mortgage',
-  'Entertainment','Shopping','Health','Travel','Subscriptions',
-  'Insurance','Personal Care','Education','Pets',
-  'CC Payment','Transfer','Cash',
-  'Income','Freelance Income','Reimbursement',
-  'Uncategorized'
-]
 
 function fmt(n) {
   return new Intl.NumberFormat('en-US', { style:'currency', currency:'USD' }).format(n)
@@ -323,13 +315,12 @@ export default function ImportPage() {
                     style={{ background:'transparent', border:'none', color:'var(--text)', fontSize:12, width:'100%', outline:'none' }}
                   />
                   {/* Category */}
-                  <select
+                  <CategorySelect
                     value={row.category || 'Uncategorized'}
-                    onChange={e => updateRow(row._id, 'category', e.target.value)}
-                    style={{ background:'var(--bg3)', border:'none', color:'var(--text)', fontSize:11, borderRadius:6, padding:'3px 6px', outline:'none', width:'100%' }}
-                  >
-                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                    onChange={name => updateRow(row._id, 'category', name)}
+                    style={{ fontSize:11, padding:'4px 8px', borderRadius:6, border:'none', background:'var(--bg3)' }}
+                    showManage={false}
+                  />
                   {/* Amount + type toggle */}
                   <div style={{ textAlign:'right' }}>
                     {row.needs_review && (
