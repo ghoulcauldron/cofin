@@ -294,27 +294,12 @@ img { display: block; max-width: 100%; }
   padding: 8px 0;
 }
 
-/* ─── Mobile overflow prevention ────────────────────────── */
+/* ─── Mobile containment ─────────────────────────────────── */
 @media (max-width: 767px) {
-  /* Every direct child of main-content must stay within bounds */
-  .main-content > * {
-    max-width: 100vw;
-    overflow-x: hidden;
-  }
-
-  /* Cards must never exceed viewport */
+  /* Cards fill width and clip internal overflow cleanly */
   .card, .card-lg {
-    max-width: 100%;
-  }
-
-  /* All flex rows that could overflow get wrap */
-  .btn {
-    white-space: nowrap;
-  }
-
-  /* Reduce padding on all page containers */
-  [style*="padding:'24px 20px'"],
-  [style*='padding:"24px 20px"'] {
-    padding: 16px !important;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
   }
 }
