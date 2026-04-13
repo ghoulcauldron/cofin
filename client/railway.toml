@@ -1,9 +1,8 @@
 [build]
-builder = "nixpacks"
-buildCommand = "npm install && echo VITE_SUPABASE_URL=$VITE_SUPABASE_URL && npm run build"
+builder = "railpack"
+buildCommand = "npm install && npm run build"
 
 [deploy]
-startCommand = "npx serve dist -l $PORT --single"
 healthcheckPath = "/"
 healthcheckTimeout = 30
 restartPolicyType = "on_failure"
