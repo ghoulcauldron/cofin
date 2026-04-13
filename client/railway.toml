@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npm run build"
+buildCommand = "npm install && echo VITE_SUPABASE_URL=$VITE_SUPABASE_URL && npm run build"
 
 [deploy]
 startCommand = "npx serve dist -l $PORT --single"
