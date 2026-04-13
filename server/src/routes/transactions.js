@@ -11,6 +11,7 @@ transactionsRouter.get('/', async (req, res) => {
     account_id, category, is_joint, type,
     month, year, search,
     sort_by = 'date', sort_dir = 'desc',
+    visibility = 'personal', // 'personal' | 'joint' | 'all'
     limit = 50, offset = 0
   } = req.query
 
@@ -22,6 +23,15 @@ transactionsRouter.get('/', async (req, res) => {
     .eq('workspace_id', req.user.user_metadata.workspaceId)
     .order(sort_by, { ascending })
     .range(Number(offset), Number(offset) + Number(limit) - 1)
+
+  // Visibility filter — default to personal (mine) + joint (ours)
+  if (visibility === 'personal') {
+    // Show only this user's transactions (personal) + all joint transactions
+    query = query.or(`created_by.eq.${req.user.id},is_joint.eq.true`)
+  } else if (visibility === 'joint') {
+    query = query.eq('is_joint', true)
+  }
+  // visibility === 'all' shows everything (no filter)
 
   if (account_id) query = query.eq('account_id', account_id)
   if (category) query = query.eq('category', category)
@@ -137,10 +147,11 @@ transactionsRouter.delete('/:id', async (req, res) => {
   res.json({ success: true })
 })
 
-// Summary stats for dashboard
+// Summary stats for dashboard — scoped to current user's personal + joint transactions
 transactionsRouter.get('/summary', async (req, res) => {
   const { month, year } = req.query
   const workspaceId = req.user.user_metadata.workspaceId
+  const userId = req.user.id
   const m = month || new Date().getMonth() + 1
   const y = year || new Date().getFullYear()
   const start = `${y}-${String(m).padStart(2, '0')}-01`
@@ -148,20 +159,21 @@ transactionsRouter.get('/summary', async (req, res) => {
 
   const { data, error } = await supabase
     .from('transactions')
-    .select('amount, type, category, is_joint')
+    .select('amount, type, category, is_joint, created_by')
     .eq('workspace_id', workspaceId)
     .gte('date', start)
     .lte('date', end)
+    .or(`created_by.eq.${userId},is_joint.eq.true`)
 
   if (error) return res.status(400).json({ error: error.message })
 
-  const income = data.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
-  const expenses = data.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-  const joint = data.filter(t => t.is_joint).reduce((s, t) => s + t.amount, 0)
+  const income = data.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
+  const expenses = data.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0)
+  const joint = data.filter(t => t.is_joint).reduce((s, t) => s + Number(t.amount), 0)
 
   const byCategory = data.reduce((acc, t) => {
     if (t.type !== 'expense') return acc
-    acc[t.category] = (acc[t.category] || 0) + t.amount
+    acc[t.category] = (acc[t.category] || 0) + Number(t.amount)
     return acc
   }, {})
 

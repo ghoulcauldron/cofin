@@ -34,7 +34,7 @@ export default function DashboardPage() {
         const [summaryData, splitData, txData] = await Promise.all([
           api.get(`/transactions/summary?month=${now.getMonth()+1}&year=${now.getFullYear()}`),
           api.get('/split/balance'),
-          api.get('/transactions?limit=5')
+          api.get('/transactions?limit=5&visibility=personal')
         ])
         setSummary(summaryData)
         setSplit(splitData)

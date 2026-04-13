@@ -50,6 +50,8 @@ function EditDrawer({ tx, onClose, onSave, onDelete }) {
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [error, setError] = useState('')
+  const [ruleSuggestion, setRuleSuggestion] = useState(null)
+  const [savingRule, setSavingRule] = useState(false)
 
   function set(field, value) { setForm(prev => ({ ...prev, [field]: value })) }
 
@@ -57,9 +59,35 @@ function EditDrawer({ tx, onClose, onSave, onDelete }) {
     setSaving(true); setError('')
     try {
       const updated = await api.patch(`/transactions/${tx.id}`, { ...form, amount: parseFloat(form.amount) || 0 })
+      // Check if category changed — if so, ask server if a rule should be suggested
+      if (form.category !== tx.category) {
+        api.post('/rules/learn', {
+          description: form.description,
+          category: form.category,
+          is_joint: form.is_joint
+        }).then(suggestion => {
+          if (suggestion?.suggest) setRuleSuggestion(suggestion)
+        }).catch(() => {})
+      }
       onSave(updated)
     } catch (e) { setError(e.message) }
     finally { setSaving(false) }
+  }
+
+  async function acceptRule() {
+    if (!ruleSuggestion) return
+    setSavingRule(true)
+    try {
+      await api.post('/rules', {
+        pattern: ruleSuggestion.pattern,
+        match_type: ruleSuggestion.match_type,
+        category: ruleSuggestion.category,
+        is_joint: ruleSuggestion.is_joint,
+        auto_learned: true
+      })
+      setRuleSuggestion(null)
+    } catch (e) { console.error(e) }
+    finally { setSavingRule(false) }
   }
 
   async function handleDelete() {
@@ -139,6 +167,30 @@ function EditDrawer({ tx, onClose, onSave, onDelete }) {
           </div>
 
           {error && <div style={{ padding:'10px 14px', background:'rgba(196,112,90,0.1)', borderRadius:8, color:'var(--danger)', fontSize:13 }}>{error}</div>}
+
+          {ruleSuggestion && (
+            <div style={{ marginTop:12, padding:'12px 14px', background:'rgba(143,166,138,0.1)', border:'0.5px solid rgba(143,166,138,0.3)', borderRadius:10 }}>
+              <div style={{ fontSize:12, color:'var(--accent2)', fontWeight:500, marginBottom:6 }}>
+                ✦ Rule suggestion
+              </div>
+              <div style={{ fontSize:12, color:'var(--muted)', marginBottom:10 }}>
+                {ruleSuggestion.confidence}% of transactions matching
+                <strong style={{ color:'var(--text)' }}> "{ruleSuggestion.pattern}"</strong> are{' '}
+                <strong style={{ color:'var(--text)' }}>{ruleSuggestion.category}</strong>.
+                Save as a rule to auto-categorise future imports?
+              </div>
+              <div style={{ display:'flex', gap:8 }}>
+                <button onClick={acceptRule} disabled={savingRule}
+                  style={{ padding:'6px 14px', borderRadius:6, background:'var(--accent2)', color:'#fff', border:'none', cursor:'pointer', fontSize:11, fontWeight:500, fontFamily:'var(--sans)' }}>
+                  {savingRule ? 'Saving…' : 'Save rule'}
+                </button>
+                <button onClick={() => setRuleSuggestion(null)}
+                  style={{ padding:'6px 12px', borderRadius:6, background:'transparent', color:'var(--muted)', border:'0.5px solid var(--border)', cursor:'pointer', fontSize:11, fontFamily:'var(--sans)' }}>
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div style={{ padding:'16px 24px', borderTop:'0.5px solid var(--border)', display:'flex', gap:10, position:'sticky', bottom:0, background:'var(--bg2)' }}>
@@ -169,6 +221,7 @@ export default function TransactionsPage() {
   const [searchInput, setSearchInput] = useState('')
   const [offset, setOffset] = useState(0)
   const [editing, setEditing] = useState(null)
+  const [visibility, setVisibility] = useState('personal') // 'personal' | 'all'
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const { names: categoryNames } = useCategories()
   const searchTimer = useRef(null)
@@ -189,7 +242,8 @@ export default function TransactionsPage() {
       const sb  = opts.sortBy   ?? sortBy
       const sd  = opts.sortDir  ?? sortDir
       const q   = opts.search   ?? search
-      const params = new URLSearchParams({ limit, offset: off, sort_by: sb, sort_dir: sd })
+      const vis = opts.visibility ?? visibility
+      const params = new URLSearchParams({ limit, offset: off, sort_by: sb, sort_dir: sd, visibility: vis })
       if (f === 'joint')   params.set('is_joint', 'true')
       if (f === 'income')  params.set('type', 'income')
       if (f === 'expense') params.set('type', 'expense')
@@ -202,7 +256,7 @@ export default function TransactionsPage() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { setOffset(0); load(0, { filter, category, sortBy, sortDir, search }) }, [filter, category, sort, search])
+  useEffect(() => { setOffset(0); load(0, { filter, category, sortBy, sortDir, search, visibility }) }, [filter, category, sort, search, visibility])
 
   function handleSearchInput(val) {
     setSearchInput(val)
@@ -212,6 +266,10 @@ export default function TransactionsPage() {
 
   function clearFilters() {
     setFilter('all'); setCategory(''); setSort('date:desc'); setSearch(''); setSearchInput('')
+  }
+
+  function toggleVisibility() {
+    setVisibility(v => v === 'personal' ? 'all' : 'personal')
   }
 
   const hasActiveFilters = filter !== 'all' || category || sort !== 'date:desc' || search
@@ -245,11 +303,17 @@ export default function TransactionsPage() {
     <div style={{ padding:'16px', width:'100%', boxSizing:'border-box', maxWidth:900, margin:'0 auto' }}>
 
       {/* Header */}
-      <div style={{ marginBottom:14 }}>
-        <div style={{ fontFamily:'var(--serif)', fontSize:24, letterSpacing:'-0.5px' }}>Transactions</div>
-        <div style={{ fontSize:13, color:'var(--muted)', marginTop:2 }}>
-          {count} {search ? `matching "${search}"` : 'total'}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14, gap:8 }}>
+        <div>
+          <div style={{ fontFamily:'var(--serif)', fontSize:24, letterSpacing:'-0.5px' }}>Transactions</div>
+          <div style={{ fontSize:13, color:'var(--muted)', marginTop:2 }}>
+            {count} {search ? `matching "${search}"` : 'total'}
+          </div>
         </div>
+        <button onClick={toggleVisibility}
+          style={{ flexShrink:0, padding:'7px 12px', borderRadius:8, fontSize:12, cursor:'pointer', fontFamily:'var(--sans)', border:'0.5px solid var(--border2)', background: visibility === 'all' ? 'var(--bg4)' : 'transparent', color: visibility === 'all' ? 'var(--text)' : 'var(--muted)', marginTop:4 }}>
+          {visibility === 'personal' ? 'Mine + Joint' : 'All household'}
+        </button>
       </div>
 
       {/* Search */}
