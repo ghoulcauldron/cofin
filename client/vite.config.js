@@ -11,7 +11,7 @@ export default defineConfig({
       process.env.VITE_SUPABASE_URL || 'https://mroznpukkyhsilqqvkqp.supabase.co'
     ),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(
-      process.env.VITE_SUPABASE_ANON_KEY || ''
+      process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1yb3pucHVra3loc2lscXF2a3FwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMzgwODcsImV4cCI6MjA5MDkxNDA4N30.AW3ud-J_1Dzr2pTc1PcaBjZz92wnu51VShwRzVN-47k'
     ),
     'import.meta.env.VITE_API_URL': JSON.stringify(
       process.env.VITE_API_URL || 'https://cofin-server-production.up.railway.app/api'
